@@ -23,9 +23,10 @@ logger = logging.getLogger("netsentinel.telegram_bot")
 MAIN_KEYBOARD = {
     "keyboard": [
         [{"text": "⚡ Status do Apê"}, {"text": "❄️ Geladeira & Luz"}],
-        [{"text": "🖥️ Ligar Workstation (WoL)"}, {"text": "📊 Relatório 24h"}],
-        [{"text": "🌐 Sinal Wi-Fi"}, {"text": "🛡️ Dispositivos na Rede"}],
-        [{"text": "🔋 Bateria"}, {"text": "📋 Histórico"}],
+        [{"text": "🚀 Abrir Antigravity"}, {"text": "🖥️ Ligar Workstation (WoL)"}],
+        [{"text": "📊 Relatório 24h"}, {"text": "🌐 Sinal Wi-Fi"}],
+        [{"text": "🛡️ Dispositivos na Rede"}, {"text": "🔋 Bateria"}],
+        [{"text": "📋 Histórico"}, {"text": "❓ Como Usar"}],
     ],
     "resize_keyboard": True,
     "is_persistent": True,
@@ -34,14 +35,15 @@ MAIN_KEYBOARD = {
 # Teclado Inline clicável diretamente na mensagem (perfeito para Telegram Desktop no PC)
 INLINE_QUICK_MENU = [
     [{"text": "⚡ Status", "callback_data": "/status"}, {"text": "❄️ Geladeira", "callback_data": "/geladeira"}],
-    [{"text": "🖥️ Ligar PC (WoL)", "callback_data": "/wol"}, {"text": "🛡️ Dispositivos", "callback_data": "/radar"}],
+    [{"text": "🚀 Antigravity", "callback_data": "/antigravity"}, {"text": "🖥️ Ligar PC (WoL)", "callback_data": "/wol"}],
+    [{"text": "🛡️ Dispositivos", "callback_data": "/radar"}, {"text": "🌐 Roteador", "callback_data": "/roteador"}],
     [{"text": "📊 Relatório 24h", "callback_data": "/relatorio"}, {"text": "🔋 Bateria", "callback_data": "/bateria"}],
-    [{"text": "📶 Sinal Wi-Fi", "callback_data": "/internet"}, {"text": "📋 Histórico", "callback_data": "/historico"}],
 ]
 
 BOT_COMMANDS_MENU = [
     {"command": "start", "description": "Menu principal e painel rápido"},
     {"command": "status", "description": "Ver status ao vivo do imóvel"},
+    {"command": "antigravity", "description": "Abrir o Antigravity IDE no desktop do PC"},
     {"command": "wol", "description": "Ligar a workstation Xeon via Wake-on-LAN"},
     {"command": "geladeira", "description": "Segurança dos alimentos e luz"},
     {"command": "radar", "description": "Dispositivos conectados na rede"},
@@ -230,6 +232,8 @@ class TelegramBotWorker:
             cmd = "confiar"
         elif "roteador" in raw or "modem" in raw or "gateway" in raw or first_token in ("/roteador", "roteador"):
             cmd = "roteador"
+        elif "antigravity" in raw or "agy" in raw or "abrir ide" in raw or first_token in ("/antigravity", "/agy", "antigravity", "agy"):
+            cmd = "antigravity"
         elif "ligar" in raw or "wol" in raw or "workstation" in raw or "xeon" in raw or first_token in ("/wol", "/wol_desktop", "/ligar_pc", "wol"):
             cmd = "wol"
         elif "dispositivo" in raw or "radar" in raw or "aparelho" in raw:
@@ -292,6 +296,57 @@ class TelegramBotWorker:
         # -------------------------------------------------------------
         # 0. Ligar Workstation Xeon (Wake-on-LAN)
         # -------------------------------------------------------------
+        # -------------------------------------------------------------
+        # 0. Abrir Antigravity no Desktop do PC
+        # -------------------------------------------------------------
+        elif cmd == "antigravity":
+            self.send_reply(
+                "🚀 [Antigravity] Inicializando a IDE no desktop da sua Workstation...\n"
+                "Aguarde a confirmação de execução."
+            )
+
+            def _launch_antigravity():
+                import os, subprocess
+                # Variáveis de sessão gráfica KDE / Wayland do usuário
+                env = os.environ.copy()
+                env.setdefault("DISPLAY", ":0")
+                env.setdefault("WAYLAND_DISPLAY", "wayland-0")
+                env.setdefault("XDG_RUNTIME_DIR", "/run/user/1000")
+
+                launcher = "/home/yuri/.local/bin/antigravity-launcher"
+                if not os.path.exists(launcher):
+                    launcher = "/home/yuri/.local/bin/antigravity"
+
+                success = False
+                err_msg = ""
+                try:
+                    # Tenta spawn via nohup/subprocess desacoplado na sessão do usuário
+                    subprocess.Popen(
+                        [launcher],
+                        env=env,
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL,
+                        start_new_session=True
+                    )
+                    time.sleep(3)
+                    # Verifica se o processo está em execução
+                    res = subprocess.run(["pgrep", "-f", "antigravity"], capture_output=True)
+                    if res.returncode == 0:
+                        success = True
+                except Exception as exc:
+                    err_msg = str(exc)
+
+                if success:
+                    self.send_reply(
+                        "✅ [Antigravity Ativo] A IDE Antigravity foi iniciada com sucesso na tela do seu computador!"
+                    )
+                else:
+                    self.send_reply(
+                        f"⚠️ [Falha ao Abrir] Não foi possível iniciar o Antigravity na tela.\nDetalhe: {err_msg or 'Sessão gráfica indisponível ou em bloqueio de tela.'}"
+                    )
+
+            threading.Thread(target=_launch_antigravity, daemon=True).start()
+
         elif cmd == "wol":
             xeon_mac = "00:c0:c6:25:81:52"
             xeon_ip = "192.168.0.14"

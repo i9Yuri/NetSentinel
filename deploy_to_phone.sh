@@ -3,8 +3,11 @@
 set -euo pipefail
 umask 077
 base=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
-SERIAL="${1:-192.168.0.4:5555}"
-adb=(adb -s "$SERIAL")
+if [[ $# -gt 1 || ${1:-ZF52366RHQ} != ZF52366RHQ ]]; then
+    printf 'Uso: %s [ZF52366RHQ]\n' "$0" >&2
+    exit 2
+fi
+adb=(adb -s ZF52366RHQ)
 work=$(mktemp -d)
 stage=''
 cleanup() {
@@ -136,7 +139,7 @@ install_file() {
 for name in aegis_daemon.sh aegis_daemon.py; do
     install_file "\$stage/\$name" "\$base/\$name" 0700
 done
-for name in power_watchdog.sh network_auditor.sh wol_bridge.sh arp_sentinel.sh; do
+for name in smart_profile.sh power_watchdog.sh network_auditor.sh wol_bridge.sh arp_sentinel.sh; do
     install_file "\$stage/modules/\$name" "\$base/modules/\$name" 0700
 done
 if [ ! -e "\$base/config.json" ]; then

@@ -1,5 +1,6 @@
 #!/system/bin/sh
 # Carregado por aegis_daemon.sh. Os estados elétricos vêm do PMI632.
+. "$base/modules/smart_profile.sh"
 power_root=${AEGIS_POWER_ROOT:-/sys/class/power_supply}
 
 read_node() {
@@ -43,7 +44,7 @@ power_snapshot_sql() {
         "$1" "$2" "$battery_pct" "$temp_tenths" "$battery_uv" "$battery_ua" "$usb_uv"
 }
 
-power_transition() (
+power_record_transition() (
     if [ "$candidate" = 0 ]; then
         read_node battery/charge_full
         if [ "$reading" = NULL ] || [ "$reading" -le 0 ]; then
@@ -85,13 +86,43 @@ power_transition() (
       COMMIT;" >/dev/null
 )
 
+dispatch_power_profile() {
+    [ -n "$profile_pending" ] || return 0
+    # Mantém apenas o perfil mais recente enquanto a aplicação anterior termina.
+    if [ -n "$profile_worker" ] && kill -0 "$profile_worker" 2>/dev/null; then
+        return 0
+    fi
+    {
+        sync_profile_with_power "$profile_pending" ||
+            printf 'Aegis: falha ao aplicar perfil de energia (AC=%s).\n' "$profile_pending" >&2
+    } 9>&- >/dev/null &
+    profile_worker=$!
+    profile_pending=''
+}
+
+queue_power_profile() {
+    [ "$1" != "$profile_requested" ] || return 0
+    profile_requested=$1
+    profile_pending=$1
+    dispatch_power_profile
+}
+
+power_transition() {
+    power_record_transition || return 1
+    queue_power_profile "$candidate"
+}
+
 power_loop() {
     stable=$(sql 'SELECT ac FROM power_status WHERE id=1;') || return 1
     candidate='' lost_since_uptime='' last_snapshot=-60
+    profile_pending='' profile_requested='' profile_worker=''
     while :; do
         now_up=$(uptime_seconds) || return 1
         is_external_power_present
         current=$?
+        if [ "$current" != 2 ] && { [ -z "$profile_requested" ] || [ "$current" = "$stable" ]; }; then
+            queue_power_profile "$current"
+        fi
         if [ "$current" = 2 ] || [ "$current" = "$stable" ]; then
             candidate=''
         elif [ "$current" != "$candidate" ]; then
@@ -122,6 +153,7 @@ power_loop() {
             read_battery
             sql "$(power_snapshot_sql "$now" "$stable")" >/dev/null && last_snapshot=$now_up
         fi
+        dispatch_power_profile
         sleep 1
     done
 }

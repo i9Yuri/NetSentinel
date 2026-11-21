@@ -23,9 +23,9 @@ logger = logging.getLogger("netsentinel.telegram_bot")
 MAIN_KEYBOARD = {
     "keyboard": [
         [{"text": "⚡ Status do Apê"}, {"text": "❄️ Geladeira & Luz"}],
-        [{"text": "📊 Relatório 24h"}, {"text": "🔋 Bateria"}],
+        [{"text": "🖥️ Ligar Workstation (WoL)"}, {"text": "📊 Relatório 24h"}],
         [{"text": "🌐 Sinal Wi-Fi"}, {"text": "🛡️ Dispositivos na Rede"}],
-        [{"text": "📋 Histórico"}, {"text": "❓ Como Usar"}],
+        [{"text": "🔋 Bateria"}, {"text": "📋 Histórico"}],
     ],
     "resize_keyboard": True,
     "is_persistent": True,
@@ -34,7 +34,7 @@ MAIN_KEYBOARD = {
 # Teclado Inline clicável diretamente na mensagem (perfeito para Telegram Desktop no PC)
 INLINE_QUICK_MENU = [
     [{"text": "⚡ Status", "callback_data": "/status"}, {"text": "❄️ Geladeira", "callback_data": "/geladeira"}],
-    [{"text": "🛡️ Dispositivos", "callback_data": "/radar"}, {"text": "🌐 Roteador", "callback_data": "/roteador"}],
+    [{"text": "🖥️ Ligar PC (WoL)", "callback_data": "/wol"}, {"text": "🛡️ Dispositivos", "callback_data": "/radar"}],
     [{"text": "📊 Relatório 24h", "callback_data": "/relatorio"}, {"text": "🔋 Bateria", "callback_data": "/bateria"}],
     [{"text": "📶 Sinal Wi-Fi", "callback_data": "/internet"}, {"text": "📋 Histórico", "callback_data": "/historico"}],
 ]
@@ -42,6 +42,7 @@ INLINE_QUICK_MENU = [
 BOT_COMMANDS_MENU = [
     {"command": "start", "description": "Menu principal e painel rápido"},
     {"command": "status", "description": "Ver status ao vivo do imóvel"},
+    {"command": "wol", "description": "Ligar a workstation Xeon via Wake-on-LAN"},
     {"command": "geladeira", "description": "Segurança dos alimentos e luz"},
     {"command": "radar", "description": "Dispositivos conectados na rede"},
     {"command": "investigar", "description": "Raio-X de portas e serviços de um aparelho"},
@@ -229,6 +230,8 @@ class TelegramBotWorker:
             cmd = "confiar"
         elif "roteador" in raw or "modem" in raw or "gateway" in raw or first_token in ("/roteador", "roteador"):
             cmd = "roteador"
+        elif "ligar" in raw or "wol" in raw or "workstation" in raw or "xeon" in raw or first_token in ("/wol", "/wol_desktop", "/ligar_pc", "wol"):
+            cmd = "wol"
         elif "dispositivo" in raw or "radar" in raw or "aparelho" in raw:
             cmd = "radar"
         elif "status" in raw:
@@ -286,6 +289,62 @@ class TelegramBotWorker:
         # -------------------------------------------------------------
         # 2. Geladeira & Luz
         # -------------------------------------------------------------
+        # -------------------------------------------------------------
+        # 0. Ligar Workstation Xeon (Wake-on-LAN)
+        # -------------------------------------------------------------
+        elif cmd == "wol":
+            xeon_mac = "00:c0:c6:25:81:52"
+            xeon_ip = "192.168.0.14"
+            broadcast_ip = "192.168.0.255"
+
+            self.send_reply(
+                "⚡ [Wake-on-LAN] Enviando Magic Packet Ethernet para a Workstation Xeon...\n"
+                f"• MAC Alvo: `{xeon_mac}`\n"
+                f"• IP Previsto: `{xeon_ip}`\n\n"
+                "Aguarde ~15 segundos para a confirmação de inicialização."
+            )
+
+            def _trigger_wol():
+                import socket, subprocess
+                # 1. Envio UDP Broadcast no socket local
+                try:
+                    mac_bytes = bytes.fromhex(xeon_mac.replace(":", ""))
+                    magic = b"\xff" * 6 + mac_bytes * 16
+                    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+                        s.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+                        s.sendto(magic, (broadcast_ip, 9))
+                except Exception as exc:
+                    logger.warning("Falha WoL local: %s", exc)
+
+                # 2. Acionamento remoto no Moto E7 Plus via ADB caso configurado
+                try:
+                    subprocess.run(
+                        ["adb", "shell", "su", "-c", "/data/adb/aegis_sentinel/modules/wol_bridge.sh"],
+                        timeout=5, capture_output=True
+                    )
+                except Exception:
+                    pass
+
+                # Aguarda 15s e testa resposta ICMP
+                time.sleep(15)
+                ping_ok = False
+                try:
+                    res = subprocess.run(["ping", "-c", "1", "-W", "2", xeon_ip], capture_output=True)
+                    ping_ok = (res.returncode == 0)
+                except Exception:
+                    pass
+
+                if ping_ok:
+                    self.send_reply(
+                        f"✅ [Workstation Ligada] A máquina respondeu ao ping no IP `{xeon_ip}` com sucesso!"
+                    )
+                else:
+                    self.send_reply(
+                        f"ℹ️ [Wake-on-LAN Despachado] Pacote mágico emitido para `{xeon_mac}`. A workstation ainda não respondeu ao ping (pode estar no POST/boot do SO)."
+                    )
+
+            threading.Thread(target=_trigger_wol, daemon=True).start()
+
         elif cmd == "geladeira":
             state = self.service.state
             stats = self.service.storage.fetch_stats_24h()

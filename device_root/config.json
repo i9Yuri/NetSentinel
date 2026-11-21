@@ -1,0 +1,19 @@
+{
+  "telegram_bot_token": "9042170479:AAGU51KbgzhycIwNI9clfCx_8VP2jmeSSWQ",
+  "telegram_chat_id": "5853377322",
+  "location_label": "Resid\u00eancia em Campina Grande",
+  "xeon_mac": "00:c0:c6:25:81:52",
+  "xeon_ip": "192.168.0.14",
+  "broadcast_ip": "192.168.0.255",
+  "gateway_ip": "192.168.0.1",
+  "ping_targets": [
+    "1.1.1.1",
+    "8.8.8.8"
+  ],
+  "dns_test_domains": [
+    "google.com",
+    "gov.br"
+  ],
+  "ptt_target": "200.160.2.3",
+  "metrics_db": "/data/adb/aegis_sentinel/data/metrics.db"
+}

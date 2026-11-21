@@ -1,0 +1,408 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Aegis Sentinel — Painel de monitoramento</title>
+<style>
+/* Hallmark | shape: app screen | theme: custom | genre: dashboard | motion: still */
+/* Critique: telemetria em primeiro plano e controles próximos do estado do aparelho. */
+:root {
+  color-scheme: dark;
+  --surface-canvas: #090d16;
+  --surface-card: #111c2c;
+  --surface-raised: #1b2a3d;
+  --surface-chart: #0d1624;
+  --border-subtle: #2e4059;
+  --border-active: #5bcaff;
+  --text-primary: #f8fafc;
+  --text-secondary: #b5c5d7;
+  --text-muted: #a9bcd2;
+  --accent-primary: #65d0ff;
+  --accent-success: #6ee7ba;
+  --accent-warning: #fbd36c;
+  --accent-danger: #ffadb3;
+  --text-action: #06121e;
+  --font-ui: "Inter", system-ui, sans-serif;
+  --font-data: "IBM Plex Mono", ui-monospace, monospace;
+  --radius-panel: 1rem;
+}
+* { box-sizing: border-box; }
+html, body { overflow-x: clip; }
+body { margin: 0; background: var(--surface-canvas); color: var(--text-primary); font: 1rem/1.5 var(--font-ui); }
+.wrap { max-inline-size: 82rem; margin-inline: auto; padding-inline: clamp(1rem, 4vw, 3rem); }
+.top { border-block-end: 1px solid var(--border-subtle); }
+.top .wrap, .top-actions, .brand, .page-head, .section-head, .chart-footer, .tools, .button {
+  display: flex; align-items: center; flex-wrap: wrap; gap: .75rem;
+}
+.top .wrap, .page-head, .section-head, .chart-footer { justify-content: space-between; }
+.top .wrap { padding-block: .8rem; }
+.brand { font-weight: 700; }
+.brand svg { inline-size: 2rem; block-size: 2rem; color: var(--accent-primary); }
+.top-actions, .section-head { gap: .5rem .9rem; }
+.source { color: var(--text-secondary); font-size: .875rem; }
+main { padding-block: 1.75rem 3rem; }
+.page-head { align-items: end; margin-block-end: 1.4rem; }
+h1, h2, p, figure, dl, dd { margin: 0; }
+h1 { font-size: clamp(2rem, 1.25rem + 2.5vw, 3.25rem); line-height: 1.1; letter-spacing: -.035em; overflow-wrap: break-word; min-width: 0; }
+h2 { font-size: 1.1rem; line-height: 1.3; }
+.caption, .note { font-size: .875rem; color: var(--text-secondary); }
+.page-head p { margin-block-start: .4rem; }
+.updated { font-size: .8rem; color: var(--text-muted); }
+.grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) minmax(0, 1.22fr);
+  grid-template-areas: "link link link power" "link link link control" "targets targets targets targets";
+  gap: 1rem;
+}
+.panel { min-inline-size: 0; padding: clamp(1rem, 2.3vw, 1.4rem); border-radius: var(--radius-panel); background: var(--surface-card); border: 1px solid var(--border-subtle); }
+.link { grid-area: link; }
+.power { grid-area: power; }
+.control { grid-area: control; }
+.targets { grid-area: targets; }
+.indicator { font-size: .875rem; color: var(--text-muted); }
+[data-tone="success"] { color: var(--accent-success); }
+[data-tone="warning"] { color: var(--accent-warning); }
+[data-tone="error"] { color: var(--accent-danger); }
+.metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .6rem; margin-block: 1.1rem; }
+.metrics div + div { border-inline-start: 1px solid var(--border-subtle); padding-inline-start: .7rem; }
+dt { color: var(--text-secondary); font-size: .875rem; }
+dd { overflow-wrap: anywhere; }
+.metric-value, .battery { font-family: var(--font-data); font-variant-numeric: tabular-nums; }
+.metric-value { font-size: clamp(1.15rem, .85rem + 1.4vw, 2.05rem); font-weight: 650; }
+.unit { color: var(--text-secondary); font-size: .75rem; }
+.button, select {
+  min-block-size: 3rem; max-inline-size: 100%; border: 1px solid var(--border-subtle);
+  border-radius: 999px; padding: .45rem .9rem; background: var(--surface-raised);
+  color: var(--text-primary); font: 600 .875rem/1.35 var(--font-ui);
+}
+.button { justify-content: center; cursor: pointer; gap: .5rem; }
+.button svg { inline-size: 1.125rem; block-size: 1.125rem; }
+.button.primary { background: var(--accent-primary); color: var(--text-action); border-color: var(--accent-primary); }
+.button:hover:enabled, select:hover:enabled { border-color: var(--border-active); }
+.button.primary:hover:enabled { background: var(--text-primary); }
+.button:active:enabled { transform: translateY(1px); }
+.button:focus-visible, select:focus-visible, .table-scroll:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: 3px; }
+.button:disabled, select:disabled { cursor: not-allowed; opacity: .65; }
+.button[aria-pressed="true"] { border-color: var(--accent-primary); color: var(--accent-primary); }
+.chart-tools { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .5rem; margin-block-end: .7rem; }
+.chart-tools select { flex: 0 1 16rem; }
+.plot { display: grid; grid-template-columns: 4ch minmax(0, 1fr); align-items: stretch; gap: .55rem; }
+.plot-labels { display: flex; flex-direction: column; justify-content: space-between; color: var(--text-muted); font: .75rem/1 var(--font-data); text-align: end; }
+.plot-area {
+  position: relative; block-size: clamp(11rem, 22vw, 16rem); min-inline-size: 0;
+  background-color: var(--surface-chart); border: 1px solid var(--border-subtle); border-radius: .55rem;
+}
+.plot-area svg { position: absolute; inset: 0; inline-size: 100%; block-size: 100%; overflow: visible; }
+.plot-area line { stroke: var(--border-subtle); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.plot-area .sample { stroke: var(--accent-primary); stroke-width: 3; vector-effect: non-scaling-stroke; }
+.plot-area .dot { stroke-width: 6; stroke-linecap: round; }
+.plot-empty { position: absolute; inset: 0; display: grid; place-items: center; padding: .65rem; text-align: center; }
+[hidden] { display: none !important; }
+.chart-footer { min-block-size: 2rem; padding-inline-start: 3.1rem; margin-block-start: .45rem; }
+.power .indicator { margin-block: .4rem .8rem; }
+.battery { font-size: clamp(1.75rem, 1.2rem + 2vw, 2.5rem); line-height: 1.3; font-weight: 650; }
+meter { display: block; inline-size: 100%; block-size: .75rem; margin-block: .3rem .7rem; accent-color: var(--accent-success); }
+.control .button { inline-size: 100%; margin-block: .45rem; }
+.control h2 { margin-block-end: .45rem; }
+.control .note { min-block-size: 2.75em; }
+.table-scroll { overflow-x: auto; margin-block-start: .55rem; }
+table { inline-size: 100%; border-collapse: collapse; text-align: start; }
+th, td { padding: .6rem .45rem; border-block-end: 1px solid var(--border-subtle); text-align: start; }
+th { color: var(--text-secondary); font-size: .875rem; font-weight: 580; }
+td { font-variant-numeric: tabular-nums; }
+td:first-child { overflow-wrap: anywhere; }
+tbody tr:last-child td { border-block-end: 0; }
+@media (max-width: 63rem) {
+  .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-areas: "link link" "power control" "targets targets"; }
+}
+@media (max-width: 34rem) {
+  .grid { grid-template-columns: minmax(0, 1fr); grid-template-areas: "link" "power" "control" "targets"; }
+  .chart-tools select { flex-basis: 100%; }
+  .chart-footer { padding-inline-start: 0; }
+  .top-actions { inline-size: 100%; justify-content: space-between; }
+  th, td { padding-inline: .3rem; }
+}
+@media (prefers-reduced-motion: reduce) { .button:active:enabled { transform: none; } }
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <div class="brand">
+      <svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="m16 3 11 4v8c0 7-4 11-11 14C9 26 5 22 5 15V7l11-4Z"/><path d="M9 16h4l2-5 3 10 2-5h3"/>
+      </svg>
+      Aegis Sentinel
+    </div>
+    <div class="top-actions">
+      <span class="source" id="source" role="status">Aguardando conexão</span>
+      <button type="button" class="button" id="refresh" disabled>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5M6.1 7a7 7 0 0 1 10.8-1.2L20 12M4 12l3.1 6.2A7 7 0 0 0 17.9 17"/></svg>
+        <span id="refresh-label">Atualizar</span>
+      </button>
+    </div>
+  </div>
+</header>
+<main class="wrap">
+  <div class="page-head">
+    <div>
+      <h1>Painel de monitoramento</h1>
+      <p class="caption">Acompanhe o link, a alimentação e a bateria do sentinela.</p>
+    </div>
+    <p class="updated" id="updated">Última consulta: —</p>
+  </div>
+  <noscript><p class="note">Ative o JavaScript para consultar o sentinela e enviar Wake-on-LAN.</p></noscript>
+  <div class="grid">
+    <section class="panel link" aria-labelledby="link-title">
+      <div class="section-head">
+        <h2 id="link-title">Qualidade do link</h2>
+        <span class="indicator" id="link-state">Sem coleta disponível</span>
+      </div>
+      <dl class="metrics">
+        <div><dt>Latência (RTT)</dt><dd class="metric-value"><span id="rtt_ms">—</span> <span class="unit">ms</span></dd></div>
+        <div><dt>Jitter</dt><dd class="metric-value"><span id="jitter_ms">—</span> <span class="unit">ms</span></dd></div>
+        <div><dt>Perda de pacotes</dt><dd class="metric-value"><span id="loss_pct">—</span> <span class="unit">%</span></dd></div>
+      </dl>
+      <div class="chart-tools">
+        <div class="tools" role="group" aria-label="Métrica do gráfico">
+          <button class="button" type="button" data-metric="rtt_ms" aria-pressed="true" disabled>RTT</button>
+          <button class="button" type="button" data-metric="jitter_ms" aria-pressed="false" disabled>Jitter</button>
+          <button class="button" type="button" data-metric="loss_pct" aria-pressed="false" disabled>Perda</button>
+        </div>
+        <select id="target" aria-label="Destino monitorado" disabled><option value="">Sem destinos</option></select>
+      </div>
+      <figure aria-labelledby="chart-summary">
+        <div class="plot" aria-hidden="true">
+          <div class="plot-labels"><span id="axis-top">—</span><span id="axis-mid">—</span><span id="axis-bottom">—</span></div>
+          <div class="plot-area">
+            <svg id="plot" viewBox="0 0 600 160" preserveAspectRatio="none">
+              <line x1="0" y1="40" x2="600" y2="40"/><line x1="0" y1="80" x2="600" y2="80"/><line x1="0" y1="120" x2="600" y2="120"/><g id="samples"/>
+            </svg>
+            <p class="plot-empty note" id="plot-empty">O gráfico será exibido após a primeira coleta.</p>
+          </div>
+        </div>
+        <figcaption class="chart-footer caption"><span id="chart-summary">Histórico recente</span><span id="chart-range"></span></figcaption>
+      </figure>
+    </section>
+
+    <section class="panel power" aria-labelledby="power-title">
+      <h2 id="power-title">Energia e bateria</h2>
+      <p class="indicator" id="power-state">Sem leitura de energia</p>
+      <dl>
+        <dt>Bateria do sentinela</dt>
+        <dd class="battery" id="battery">—</dd>
+      </dl>
+      <meter id="meter" min="0" max="100" value="0" aria-label="Carga da bateria" hidden></meter>
+      <p class="note" id="power-detail">Aguardando leitura da bateria.</p>
+    </section>
+
+    <section class="panel control" aria-labelledby="control-title">
+      <h2 id="control-title">Controles</h2>
+      <button type="button" class="button primary" id="wol" disabled>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M12 2v10m5.3-8a9 9 0 1 1-10.6 0"/></svg>
+        <span id="wol-label">Acordar workstation</span>
+      </button>
+      <button type="button" class="button" id="probe" disabled>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12h4l3-7 4 14 3-7h4"/></svg>
+        <span id="probe-label">Testar gateway</span>
+      </button>
+      <p class="note" id="action-message" role="status">O Wake-on-LAN verifica o ping após 15 s.</p>
+    </section>
+
+    <section class="panel targets" aria-labelledby="targets-title">
+      <div class="section-head">
+        <h2 id="targets-title">Destinos do último ciclo</h2>
+        <p class="caption" id="cycle-time">Sem ciclo registrado</p>
+      </div>
+      <div class="table-scroll" tabindex="0" role="region" aria-label="Métricas por destino">
+        <table>
+          <thead><tr><th scope="col">Destino</th><th scope="col">RTT (ms)</th><th scope="col">Jitter (ms)</th><th scope="col">Perda (%)</th></tr></thead>
+          <tbody id="targets"><tr><td colspan="4">Aguardando medições.</td></tr></tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+</main>
+<script>
+"use strict";
+const $ = (id) => document.getElementById(id);
+const format = new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 1 });
+const date = new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" });
+const roles = { gateway: "Gateway", dns: "Servidor DNS", ix: "Ponto de troca", desktop: "Workstation" };
+const fields = { rtt_ms: ["RTT", "ms"], jitter_ms: ["Jitter", "ms"], loss_pct: ["Perda", "%"] };
+const metricButtons = [...document.querySelectorAll("[data-metric]")];
+const label = (row) => `${roles[row.role] ?? row.role} · ${row.target}`;
+const key = (row) => JSON.stringify([row.role, row.target]);
+const number = (value) => Number.isFinite(value) ? format.format(value) : "—";
+const moment = (seconds) => date.format(seconds * 1000);
+let status = { power: null, cycle: null, history: [] };
+let metric = "rtt_ms";
+let refreshing = false;
+let busyAction = false;
+let connected = false;
+
+function text(id, value, tone = "") {
+  $(id).textContent = value;
+  $(id).dataset.tone = tone;
+}
+
+function svgLine(x1, y1, x2, y2, dot = false) {
+  const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+  for (const [name, value] of Object.entries({ x1, y1, x2, y2 })) line.setAttribute(name, value);
+  line.setAttribute("class", dot ? "sample dot" : "sample");
+  $("samples").append(line);
+}
+
+function renderChart() {
+  const series = status.history.filter((row) => key(row) === $("target").value);
+  const values = series.filter((row) => Number.isFinite(row[metric]));
+  const current = series.find((row) => row.cycle_id === status.cycle?.id);
+  for (const field of Object.keys(fields)) text(field, number(current?.[field]));
+  $("samples").replaceChildren();
+  $("plot-empty").hidden = values.length > 0;
+  text("plot-empty", series.length ? "Sem valores registrados para esta métrica." : "O gráfico será exibido após a primeira coleta.");
+  const [name, unit] = fields[metric];
+  const maximum = metric === "loss_pct" ? 100 : Math.max(1, ...values.map((row) => row[metric]));
+  text("axis-top", values.length ? number(maximum) : "—");
+  text("axis-mid", values.length ? number(maximum / 2) : "—");
+  text("axis-bottom", values.length ? "0" : "—");
+  text("chart-summary", `${name} (${unit}) · ${values.length} amostra${values.length === 1 ? "" : "s"}`);
+  if (!series.length) {
+    text("chart-range", "");
+    return;
+  }
+  const start = Math.min(...series.map((row) => row.at));
+  const end = Math.max(...series.map((row) => row.at));
+  text("chart-range", start === end ? moment(start) : `${moment(start)} – ${moment(end)}`);
+  let previous = null;
+  for (const row of series) {
+    if (!Number.isFinite(row[metric])) {
+      previous = null;
+      continue;
+    }
+    const x = start === end ? 300 : 6 + 588 * (row.at - start) / (end - start);
+    const y = 153 - 146 * row[metric] / maximum;
+    if (previous) svgLine(...previous, x, y);
+    svgLine(x, y, x + .01, y, true);
+    previous = [x, y];
+  }
+}
+
+function render() {
+  const { power, cycle, history } = status;
+  const now = Date.now() / 1000;
+  const stalePower = power && now - power.at > 180;
+  const staleLink = cycle && now - cycle.at > 3600;
+  text("link-state", staleLink ? "Ciclo desatualizado" : cycle ? cycle.severe ? "Degradação severa" :
+    "Sem degradação severa" : "Sem coleta disponível", staleLink ? "warning" : cycle ? cycle.severe ? "error" : "success" : "");
+  text("power-state", power?.ac === 1 ? "Alimentação conectada" : power?.ac === 0 ?
+    "Alimentação desconectada" : "Sem leitura de energia",
+    stalePower ? "warning" : power?.ac === 1 ? "success" : power?.ac === 0 ? "warning" : "");
+  text("battery", Number.isFinite(power?.battery) ? `${number(power.battery)}%` : "—");
+  $("meter").hidden = !Number.isFinite(power?.battery);
+  $("meter").value = power?.battery ?? 0;
+  text("power-detail", power ? `${stalePower ? "Leitura desatualizada. " : ""}${moment(power.at)}` +
+    (Number.isFinite(power.temperature) ? ` · ${number(power.temperature)} °C` : "") : "Aguardando leitura da bateria.");
+  text("cycle-time", cycle ? moment(cycle.at) : "Sem ciclo registrado");
+  const latest = cycle ? history.filter((row) => row.cycle_id === cycle.id) : [];
+  const selected = $("target").value;
+  const targets = new Map(history.map((row) => [key(row), row]));
+  $("target").replaceChildren(...[...targets].map(([value, row]) => new Option(label(row), value)));
+  if (!targets.size) $("target").append(new Option("Sem destinos", ""));
+  $("target").value = targets.has(selected) ? selected :
+    key(latest.find((row) => row.role === "dns") ?? latest[0] ?? history[0] ?? {});
+  if (!$("target").value && targets.size) $("target").selectedIndex = 0;
+  $("target").disabled = !targets.size;
+  for (const button of metricButtons) button.disabled = !targets.size;
+  $("targets").replaceChildren();
+  for (const row of latest) {
+    const tr = $("targets").insertRow();
+    for (const value of [label(row), ...Object.keys(fields).map((field) => number(row[field]))]) {
+      tr.insertCell().textContent = value;
+    }
+  }
+  if (!latest.length) {
+    const cell = $("targets").insertRow().insertCell();
+    cell.colSpan = 4;
+    cell.textContent = "Aguardando medições.";
+  }
+  renderChart();
+}
+
+async function request(path, options) {
+  const response = await fetch(path, options);
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error ?? "Serviço indisponível.");
+  return data;
+}
+
+async function refresh() {
+  if (refreshing) return;
+  refreshing = true;
+  $("refresh").disabled = true;
+  text("refresh-label", "Consultando…");
+  try {
+    status = await request("/api/status");
+    connected = true;
+    render();
+    text("source", status.source);
+    text("updated", `Última consulta: ${date.format(Date.now())}`);
+  } catch (error) {
+    connected = false;
+    text("source", "Origem indisponível", "error");
+    text("updated", error.message, "error");
+  } finally {
+    refreshing = false;
+    text("refresh-label", "Atualizar");
+    $("refresh").disabled = false;
+    updateControls();
+  }
+}
+
+function updateControls() {
+  $("wol").disabled = $("probe").disabled = busyAction || !connected;
+}
+
+async function runAction(id, progress) {
+  const labelId = id + "-label";
+  const original = $(labelId).textContent;
+  busyAction = true;
+  updateControls();
+  $(id).setAttribute("aria-busy", "true");
+  text(labelId, "Verificando…");
+  text("action-message", progress);
+  try {
+    const response = await request("/api/" + id, { method: "POST", headers: { "X-Aegis-Action": id } });
+    text("action-message", response.message);
+  } catch (error) {
+    text("action-message", error.message, "error");
+  } finally {
+    busyAction = false;
+    $(id).removeAttribute("aria-busy");
+    updateControls();
+    text(labelId, original);
+  }
+}
+
+$("refresh").addEventListener("click", refresh);
+$("wol").addEventListener("click", () => runAction("wol", "Enviando Wake-on-LAN e aguardando o ping."));
+$("probe").addEventListener("click", () => runAction("probe", "Medindo a resposta do gateway."));
+$("target").addEventListener("change", renderChart);
+for (const button of metricButtons) {
+  button.addEventListener("click", () => {
+    metric = button.dataset.metric;
+    for (const option of metricButtons) option.setAttribute("aria-pressed", option === button);
+    renderChart();
+  });
+}
+if (location.protocol === "file:") {
+  text("source", "Painel desconectado", "warning");
+  text("updated", "Inicie com python3 device_root/aegis_daemon.py serve.");
+} else {
+  refresh();
+  setInterval(() => { if (!document.hidden) refresh(); }, 30000);
+}
+</script>
+</body>
+</html>

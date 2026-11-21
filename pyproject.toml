@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "netsentinel-hub"
+version = "1.0.0"
+description = "Zero-cost private power, network, and passive spectrum sentinel hub for Nobara Linux + rooted Moto E7 Plus."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = []
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+]
+
+[project.scripts]
+netsentinel-hub = "netsentinel_hub.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["hub_linux"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["hub_linux"]
+addopts = "-q"

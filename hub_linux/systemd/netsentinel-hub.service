@@ -1,0 +1,18 @@
+[Unit]
+Description=NetSentinel Hub — Dead Man's Switch & Forensic Telemetry Receiver
+After=network-online.target graphical-session.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/yuri/Desktop/Yuri/Projects/NetSentinel
+ExecStart=/home/yuri/Desktop/Yuri/Projects/NetSentinel/.venv/bin/netsentinel-hub --env /home/yuri/Desktop/Yuri/Projects/NetSentinel/.env run
+Restart=always
+RestartSec=5
+MemoryMax=40M
+CPUQuota=5%
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=default.target

@@ -154,8 +154,12 @@ telegram_loop() {
         pending=$(sql 'SELECT id FROM events WHERE sent=0 AND message IS NOT NULL ORDER BY id LIMIT 10;')
         for event_id in $pending; do
             message=$(sql "SELECT message FROM events WHERE id=$event_id;") && [ -n "$message" ] || break
-            telegram_send "$message" || break
-            sql "UPDATE events SET sent=1 WHERE id=$event_id;" || break
+            if telegram_send "$message"; then
+                sql "UPDATE events SET sent=1 WHERE id=$event_id;" || break
+            else
+                # Se falhar envio ou der timeout, marca como enviado para evitar loop infinito
+                sql "UPDATE events SET sent=1 WHERE id=$event_id;"
+            fi
         done
         handle_updates || sleep 15
     done

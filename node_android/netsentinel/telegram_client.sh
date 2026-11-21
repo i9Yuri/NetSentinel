@@ -18,7 +18,7 @@ tg_is_configured() {
     [ -n "${TELEGRAM_BOT_TOKEN:-}" ] && [ -n "${TELEGRAM_CHAT_ID:-}" ]
 }
 
-TG_KEYBOARD_JSON='{"keyboard":[[{"text":"⚡ Status do Apê"},{"text":"❄️ Geladeira & Luz"}],[{"text":"📊 Relatório 24h"},{"text":"🔋 Bateria"}],[{"text":"🌐 Sinal Wi-Fi"},{"text":"🛡️ Dispositivos na Rede"}],[{"text":"📋 Histórico"},{"text":"❓ Como Usar"}]],"resize_keyboard":true,"is_persistent":true}'
+TG_KEYBOARD_JSON='{"keyboard":[[{"text":"⚡ Status do Apê"},{"text":"❄️ Geladeira & Luz"}],[{"text":"🖥️ Ligar Workstation (WoL)"},{"text":"📊 Relatório 24h"}],[{"text":"🌐 Sinal Wi-Fi"},{"text":"🛡️ Dispositivos na Rede"}],[{"text":"🔋 Bateria"},{"text":"📋 Histórico"}]],"resize_keyboard":true,"is_persistent":true}'
 
 # Envia mensagem simples ao chat configurado; retorna 0 em sucesso
 tg_send_message() {

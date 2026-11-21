@@ -19,31 +19,61 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger("netsentinel.telegram_bot")
 
-# Teclado interativo com botões grandes de toque (zero necessidade de digitação)
-MAIN_KEYBOARD = {
-    "keyboard": [
-        [{"text": "⚡ Status do Apê"}, {"text": "❄️ Geladeira & Luz"}],
-        [{"text": "🚀 Abrir Antigravity"}, {"text": "🖥️ Ligar Workstation (WoL)"}],
-        [{"text": "📊 Relatório 24h"}, {"text": "🌐 Sinal Wi-Fi"}],
-        [{"text": "🛡️ Dispositivos na Rede"}, {"text": "🔋 Bateria"}],
-        [{"text": "📋 Histórico"}, {"text": "❓ Como Usar"}],
-    ],
-    "resize_keyboard": True,
-    "is_persistent": True,
-}
+def is_workstation_online(ip: str = "192.168.0.14") -> bool:
+    """Verifica se a workstation Xeon está ligada e respondendo a ping ou socket."""
+    import subprocess, socket
+    try:
+        # Se rodando na própria máquina (Hub Linux local)
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+            s.connect(("8.8.8.8", 80))
+            if s.getsockname()[0] == ip:
+                return True
+    except Exception:
+        pass
+    try:
+        res = subprocess.run(["ping", "-c", "1", "-W", "1", ip], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        return res.returncode == 0
+    except Exception:
+        return False
 
-# Teclado Inline clicável diretamente na mensagem (perfeito para Telegram Desktop no PC)
-INLINE_QUICK_MENU = [
-    [{"text": "⚡ Status", "callback_data": "/status"}, {"text": "❄️ Geladeira", "callback_data": "/geladeira"}],
-    [{"text": "🚀 Antigravity", "callback_data": "/antigravity"}, {"text": "🖥️ Ligar PC (WoL)", "callback_data": "/wol"}],
-    [{"text": "🛡️ Dispositivos", "callback_data": "/radar"}, {"text": "🌐 Roteador", "callback_data": "/roteador"}],
-    [{"text": "📊 Relatório 24h", "callback_data": "/relatorio"}, {"text": "🔋 Bateria", "callback_data": "/bateria"}],
-]
+
+def get_main_keyboard(workstation_online: bool | None = None) -> dict[str, Any]:
+    online = is_workstation_online() if workstation_online is None else workstation_online
+    pc_btn = {"text": "🔴 Desligar PC (Workstation)"} if online else {"text": "🟢 Ligar PC (Workstation WoL)"}
+
+    return {
+        "keyboard": [
+            [{"text": "⚡ Status do Apê"}, {"text": "❄️ Geladeira & Luz"}],
+            [{"text": "🚀 Abrir Antigravity"}, pc_btn],
+            [{"text": "📊 Relatório 24h"}, {"text": "🌐 Sinal Wi-Fi"}],
+            [{"text": "🛡️ Dispositivos na Rede"}, {"text": "🔋 Bateria"}],
+            [{"text": "📋 Histórico"}, {"text": "❓ Como Usar"}],
+        ],
+        "resize_keyboard": True,
+        "is_persistent": True,
+    }
+
+
+def get_inline_menu(workstation_online: bool | None = None) -> list[list[dict[str, str]]]:
+    online = is_workstation_online() if workstation_online is None else workstation_online
+    pc_inline = {"text": "🔴 Desligar PC", "callback_data": "/power_pc"} if online else {"text": "🟢 Ligar PC (WoL)", "callback_data": "/power_pc"}
+
+    return [
+        [{"text": "⚡ Status", "callback_data": "/status"}, {"text": "❄️ Geladeira", "callback_data": "/geladeira"}],
+        [{"text": "🚀 Antigravity", "callback_data": "/antigravity"}, pc_inline],
+        [{"text": "🛡️ Dispositivos", "callback_data": "/radar"}, {"text": "🌐 Roteador", "callback_data": "/roteador"}],
+        [{"text": "📊 Relatório 24h", "callback_data": "/relatorio"}, {"text": "🔋 Bateria", "callback_data": "/bateria"}],
+    ]
+
+
+MAIN_KEYBOARD = get_main_keyboard(True)
+INLINE_QUICK_MENU = get_inline_menu(True)
 
 BOT_COMMANDS_MENU = [
     {"command": "start", "description": "Menu principal e painel rápido"},
     {"command": "status", "description": "Ver status ao vivo do imóvel"},
     {"command": "antigravity", "description": "Abrir o Antigravity IDE no desktop do PC"},
+    {"command": "power", "description": "Ligar ou desligar a workstation Xeon de forma segura"},
     {"command": "wol", "description": "Ligar a workstation Xeon via Wake-on-LAN"},
     {"command": "geladeira", "description": "Segurança dos alimentos e luz"},
     {"command": "radar", "description": "Dispositivos conectados na rede"},
@@ -196,7 +226,7 @@ class TelegramBotWorker:
         if inline_keyboard is not None:
             payload["reply_markup"] = json.dumps({"inline_keyboard": inline_keyboard})
         elif with_keyboard:
-            payload["reply_markup"] = json.dumps(MAIN_KEYBOARD)
+            payload["reply_markup"] = json.dumps(get_main_keyboard())
 
         form = urllib.parse.urlencode(payload).encode("utf-8")
         req = urllib.request.Request(url, data=form, method="POST")
@@ -234,8 +264,10 @@ class TelegramBotWorker:
             cmd = "roteador"
         elif "antigravity" in raw or "agy" in raw or "abrir ide" in raw or first_token in ("/antigravity", "/agy", "antigravity", "agy"):
             cmd = "antigravity"
-        elif "ligar" in raw or "wol" in raw or "workstation" in raw or "xeon" in raw or first_token in ("/wol", "/wol_desktop", "/ligar_pc", "wol"):
-            cmd = "wol"
+        elif "confirmar_desligar" in raw or first_token == "/confirmar_desligar":
+            cmd = "confirmar_desligar"
+        elif "desligar" in raw or "poweroff" in raw or "shutdown" in raw or "power_pc" in raw or "ligar" in raw or "wol" in raw or "workstation" in raw or "xeon" in raw or first_token in ("/wol", "/wol_desktop", "/ligar_pc", "/power", "/desligar", "wol", "power"):
+            cmd = "power_toggle"
         elif "dispositivo" in raw or "radar" in raw or "aparelho" in raw:
             cmd = "radar"
         elif "status" in raw:

@@ -2,23 +2,30 @@
 # Carregado pelo watchdog e pela CLI de perfil via ADB.
 portable_packages='com.dywx.larkplayer
 org.swiftapps.swiftbackup
-com.caf.fmradio
-org.lineageos.recorder
 org.lineageos.aperture'
-sentry_packages="$portable_packages
-com.android.printspooler
-com.android.bips
+permanent_bloat='com.caf.fmradio
+org.lineageos.recorder
+com.android.dreams.basic
+com.android.dreams.phototable
 com.android.cellbroadcastreceiver
 com.android.cellbroadcastreceiver.module
+com.android.cellbroadcastservice
 com.android.stk
 com.android.messaging
 com.android.dialer
-com.android.calllogbackup"
+com.android.calllogbackup
+com.android.mms.service
+com.android.carrierdefaultapp
+com.android.printspooler
+com.android.bips
+com.android.printservice.recommendation'
+sentry_packages="$portable_packages
+$permanent_bloat"
 
-apply_sentry_mode() (
+disable_profile_packages() (
     installed=$(pm list packages -U --user 0) || exit 1
     failed=0
-    for package in $sentry_packages; do
+    for package do
         uid=$(printf '%s\n' "$installed" | awk -v name="package:$package" '
             $1 == name && $2 ~ /^uid:[0-9]+$/ { print substr($2, 5); exit }')
         [ -n "$uid" ] || continue
@@ -33,9 +40,18 @@ apply_sentry_mode() (
     exit "$failed"
 )
 
+apply_permanent_debloat() {
+    disable_profile_packages $permanent_bloat
+}
+
+apply_sentry_mode() {
+    disable_profile_packages $sentry_packages
+}
+
 apply_portable_mode() (
-    installed=$(pm list packages --user 0) || exit 1
     failed=0
+    apply_permanent_debloat || failed=1
+    installed=$(pm list packages --user 0) || exit 1
     for package in $portable_packages; do
         if printf '%s\n' "$installed" | grep -qxF "package:$package"; then
             pm enable --user 0 "$package" || failed=1
